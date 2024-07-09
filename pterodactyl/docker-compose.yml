@@ -1,0 +1,118 @@
+version: "3.8"
+# This section declares the basic config of all of your Containers that are
+# declared below as "services"
+x-common:
+  database:
+    &db-environment
+    MYSQL_PASSWORD: &db-password "CHANGE_ME"
+    MYSQL_ROOT_PASSWORD: "CHANGE_ME_TOO"
+  panel:
+    &panel-environment
+    #This is the URL that your panel will be on after being reverse proxied.
+    # set this to "https://yoursubdomain.yourdomain.yourdomainstld"
+    APP_URL: "https://YOUR.DOMAIN.HERE"
+    # A list of valid timezones can be found here:
+    # http://php.net/manual/en/timezones.php
+    APP_TIMEZONE: "America/Sao_Paulo"
+    APP_SERVICE_AUTHOR: "youremail@gmail.com"
+  # Mail is an optional Setup, I have the basic setup if you want to use a gmail
+  # account. You will need an App Password as the MAIL_PASSWORD field, not your
+  # gmail password. Uncomment the following lines to enable mail.
+
+  #mail:
+    #&mail-environment
+    #MAIL_FROM: "youremail@gmail.com"
+    #MAIL_DRIVER: "smtp"
+    #MAIL_HOST: "smtp.gmail.com"
+    #MAIL_PORT: "587"
+    #MAIL_USERNAME: "youremail@gmail.com"
+    #MAIL_PASSWORD: ""
+    #MAIL_ENCRYPTION: "true"
+services:
+  # Wings is the service that hooks into docker and actually creates your game
+  # servers,
+  wings:
+    image: ghcr.io/pterodactyl/wings:latest
+    restart: always
+    networks:
+      - ptero0
+    # These are the ports exposed by Wings, I don't recommend changing them.
+    ports:
+      - "8443:443"
+      - "2022:2022"
+    tty: true
+    environment:
+      TZ: "America/Sao_Paulo"
+      # For ease of setup, this is going to use root user.
+      WINGS_UID: 0
+      WINGS_GID: 0
+      WINGS_USERNAME: root
+    # This is where docker will bind certain parts of container to your actual
+    # host OS. These locations will be used later.
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock" # DO NOT CHANGE
+      - "/var/lib/docker/containers:/var/lib/docker/containers" # DO NOT CHANGE
+      - "/opt/pterodactyl/wings/config:/etc/pterodactyl" # Feel free to change.
+      - "/var/lib/pterodactyl:/var/lib/pterodactyl" # DO NOT CHANGE
+      - "/var/log/pterodactyl:/var/log/pterodactyl" # DO NOT CHANGE
+      - "/tmp/pterodactyl/:/tmp/pterodactyl/" # Recommended not to change.
+  # It's a database. Not much else to explain.
+  database:
+    image: mariadb:10.5
+    restart: always
+    command: --default-authentication-plugin=mysql_native_password
+    volumes:
+      - "/opt/pterodactyl/panel/database:/var/lib/mysql"
+    environment:
+      <<: *db-environment
+      MYSQL_DATABASE: "panel"
+      MYSQL_USER: "pterodactyl"
+  # It's a CACHE database. Not much else to explain.
+  cache:
+    image: redis:alpine
+    restart: always
+  # Now the fun part. Your actual panel.
+  panel:
+    image: ghcr.io/pterodactyl/panel:latest
+    restart: always
+    # For NGINX Reverse Proxy, I will be using these ports for simplicity.
+    ports:
+      - "802:80"
+      - "4432:443"
+    # Links these containers together in a docker network.
+    links:
+      - database
+      - cache
+    # This is where docker will bind certain parts of container to your actual
+    # host OS. These don't really matter that much.
+    volumes:
+      - "/opt/pterodactyl/panel/appvar/:/app/var/"
+      - "/opt/pterodactyl/panel/nginx/:/etc/nginx/http.d/"
+      - "/opt/pterodactyl/panel/logs/:/app/storage/logs"
+    # Sets the config stuff
+    environment:
+      <<: [*panel-environment]
+      # <<: [*mail-environment]
+      # GENERATE A 20 DIGIT STRING WITH NUMBERS AND SYMBOLS FOR THE HASHIDS_SALT
+      HASHIDS_SALT : "')><=`0\\-+,-|3+;:8|32'"
+      HASHIDS_LENGTH : "8"
+      DB_PASSWORD: *db-password
+      APP_ENV: "production"
+      APP_ENVIRONMENT_ONLY: "false"
+      CACHE_DRIVER: "redis"
+      SESSION_DRIVER: "redis"
+      QUEUE_DRIVER: "redis"
+      REDIS_HOST: "cache"
+      DB_HOST: "database"
+      DB_PORT: "3306"
+# This is Wings' Network. We don't need much depth here, all you need to know, is
+# that it allows the passthrough of the ports from Wings.
+networks:
+  ptero0:
+    name: ptero0
+    driver: bridge
+    ipam:
+      config:
+        - subnet: "192.55.0.0/16"
+    driver_opts:
+      com.docker.network.bridge.name: ptero0
