@@ -54,3 +54,7 @@ Ensure the configuration has been successfully completed. This may involve check
 
 # Final Considerations
 This repository is just something to help people without much knowledge with docker and nginx to get things runnings fast.
+
+# Credits
+
+https://www.youtube.com/watch?v=cbr8tddvAWw
