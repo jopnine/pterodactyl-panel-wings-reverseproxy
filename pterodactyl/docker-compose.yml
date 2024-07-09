@@ -94,7 +94,7 @@ services:
       <<: [*panel-environment]
       # <<: [*mail-environment]
       # GENERATE A 20 DIGIT STRING WITH NUMBERS AND SYMBOLS FOR THE HASHIDS_SALT
-      HASHIDS_SALT : "')><=`0\\-+,-|3+;:8|32'"
+      HASHIDS_SALT : "HASHID_CHANGEME"
       HASHIDS_LENGTH : "8"
       DB_PASSWORD: *db-password
       APP_ENV: "production"
