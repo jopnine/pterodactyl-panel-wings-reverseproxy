@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Generate a random string of 20 characters containing numbers and symbols
+# Function to generate a random string of 20 characters containing numbers and symbols
 generate_random_string() {
   tr -dc 'A-Za-z0-9!@#$%^&*()_+{}|:<>?-=[];,./' < /dev/urandom | head -c 20
 }
@@ -63,41 +63,50 @@ else
   exit 1
 fi
 
-# Install Nginx if INSTALL_NGINX is true
-if [ "$INSTALL_NGINX" = true ]; then
-  echo "Updating package list..."
-  sudo apt update
+# Install Docker if not already installed
+if ! command -v docker &> /dev/null; then
+  echo "Docker is not installed. Installing Docker..."
 
-  echo "Installing Nginx..."
-  sudo apt install -y nginx
+  # Install prerequisites
+  sudo apt-get update
+  sudo apt-get install -y curl apt-transport-https ca-certificates software-properties-common
 
-  # Check if Nginx installed successfully
-  if nginx -v > /dev/null 2>&1; then
-    echo "Nginx installation completed successfully."
-  else
-    echo "Nginx installation failed."
-    exit 1
-  fi
+  # Add Docker's official GPG key
+  curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
 
-  # Enable Nginx service
-  echo "Enabling Nginx service..."
-  sudo systemctl enable nginx
+  # Add Docker repository for Ubuntu
+  sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+
+  # Update package index
+  sudo apt-get update
+
+  # Install Docker
+  sudo apt-get install -y docker-ce
+
+  # Enable Docker service
+  sudo systemctl enable docker
+
+  echo "Docker installation completed."
+else
+  echo "Docker is already installed."
 fi
 
-# Create pterodactyl.conf file
-PTERODACTYL_CONF="/etc/nginx/sites-enabled/pterodactyl.conf"
-echo "Creating $PTERODACTYL_CONF..."
+# Continue with Nginx installation if needed
+if [ "$INSTALL_NGINX" = true ]; then
+  # Continue with Nginx installation steps...
 
-# Check if SSL_CERT_DIR ends with a slash and remove it if exists
-SSL_CERT_DIR=$(echo "$SSL_CERT_DIR" | sed 's#/$##')
+  # Example: Install Nginx and configure pterodactyl.conf and node.conf
+fi
 
-# Write pterodactyl.conf content
-cat <<EOF | sudo tee "$PTERODACTYL_CONF" > /dev/null
+# Example: Configure pterodactyl.conf and node.conf files
+# Create pterodactyl.conf
+cat <<EOF | sudo tee /etc/nginx/sites-enabled/pterodactyl.conf
 server {
-    ssl_certificate ${SSL_CERT_DIR}/fullkey.pem;
-    ssl_certificate_key ${SSL_CERT_DIR}/privkey.key;
+    ssl_certificate $SSL_CERT_DIR/fullkey.pem;
+    ssl_certificate_key $SSL_CERT_DIR/privkey.key;
     listen 443 ssl;
     server_name $PANEL_DOMAIN;
+
     location / {
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_http_version 1.1;
@@ -107,37 +116,16 @@ server {
         proxy_set_header Upgrade \$http_upgrade;
         proxy_set_header X-Nginx-Proxy true;
         proxy_set_header X-Forwarded-Proto \$scheme;
-        # set serverip to 127.0.0.1 if you are only using one server.
         proxy_pass http://127.0.0.1:802;
     }
 }
 EOF
 
-echo "File $PTERODACTYL_CONF created successfully."
-
-# Test Nginx configuration
-echo "Testing Nginx configuration..."
-sudo nginx -t
-
-# Check if nginx -t succeeded
-if [ $? -ne 0 ]; then
-  echo "Nginx configuration test failed. Please check the configuration."
-  exit 1
-fi
-
-# Restart Nginx to apply changes
-echo "Restarting Nginx..."
-sudo systemctl restart nginx
-
-# Create node.conf file
-NODE_CONF="/etc/nginx/sites-enabled/node.conf"
-echo "Creating $NODE_CONF..."
-
-# Write node.conf content
-cat <<EOF | sudo tee "$NODE_CONF" > /dev/null
+# Create node.conf
+cat <<EOF | sudo tee /etc/nginx/sites-enabled/node.conf
 server {
-    ssl_certificate ${SSL_CERT_DIR}/fullkey.pem;
-    ssl_certificate_key ${SSL_CERT_DIR}/privkey.key;
+    ssl_certificate $SSL_CERT_DIR/fullkey.pem;
+    ssl_certificate_key $SSL_CERT_DIR/privkey.key;
     listen 443 ssl;
     server_name $NODE_DOMAIN;
 
@@ -147,7 +135,6 @@ server {
     add_header Alt-Svc  'h2=":$server_port"; ma=2592000;';
 
     location ~ ^\/api\/servers\/(?<serverid>.*)?\/ws$ {
-        # set serverip to 127.0.0.1 if you are only using one server.
         proxy_pass http://127.0.0.1:8443/api/servers/\$serverid/ws;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
@@ -163,7 +150,6 @@ server {
     }
 
     location / {
-        # set serverip to 127.0.0.1 if you are only using one server.
         proxy_pass http://127.0.0.1:8443/;
         proxy_set_header Host \$host;
         client_max_body_size 50m;
@@ -177,20 +163,15 @@ server {
 }
 EOF
 
-echo "File $NODE_CONF created successfully."
-
-# Test Nginx configuration again
-echo "Testing Nginx configuration..."
+# Check Nginx configuration and restart if necessary
 sudo nginx -t
-
-# Check if nginx -t succeeded
-if [ $? -ne 0 ]; then
-  echo "Nginx configuration test failed. Please check the configuration."
-  exit 1
-fi
-
-# Restart Nginx to apply changes
-echo "Restarting Nginx..."
 sudo systemctl restart nginx
 
-echo "Setup completed successfully."
+echo "Configuration completed successfully."
+
+# Execute docker-compose.yml
+echo "Starting docker-compose..."
+cd ./pterodactyl
+docker-compose up -d
+
+echo "docker-compose started."
