@@ -172,6 +172,6 @@ echo "Configuration completed successfully."
 # Execute docker-compose.yml
 echo "Starting docker-compose..."
 cd ./pterodactyl
-docker-compose up -d
+docker compose up -d
 
-echo "docker-compose started."
+echo "docker compose started."
