@@ -80,8 +80,8 @@ if ! command -v docker &> /dev/null; then
   # Update package index
   sudo apt-get update
 
-  # Install Docker
-  sudo apt-get install -y docker-ce
+  # Install Docker & Nginx
+  sudo apt-get install -y docker-ce nginx
 
   # Enable Docker service
   sudo systemctl enable docker
