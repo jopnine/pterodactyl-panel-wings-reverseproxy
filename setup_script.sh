@@ -90,14 +90,6 @@ if ! command -v docker &> /dev/null; then
 else
   echo "Docker is already installed."
 fi
-
-# Continue with Nginx installation if needed
-if [ "$INSTALL_NGINX" = true ]; then
-  # Continue with Nginx installation steps...
-
-  # Example: Install Nginx and configure pterodactyl.conf and node.conf
-fi
-
 # Example: Configure pterodactyl.conf and node.conf files
 # Create pterodactyl.conf
 cat <<EOF | sudo tee /etc/nginx/sites-enabled/pterodactyl.conf
